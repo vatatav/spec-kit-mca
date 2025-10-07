@@ -1,22 +1,28 @@
 # Spec-Kit MCA (Distribution)
 
-Spec-Kit MCA is an opinionated GitHub Spec-Kit distribution with:
-- Provenance headers (generator + UTC timestamp) enforced by pre-commit + CI
-- Character hygiene gates (ASCII hyphen; no NBSP/ZWSP; UTF-8)
-- Packaging and export scripts for reproducible zips and governance bundles
-- Original templates with minimal MCA checklist bullets
+This folder is the packaged Spec-Kit MCA distribution. It contains:
+- `.specify/templates/*` - authoring templates (spec/plan/tasks)
+- `.specify/scripts/*` - helper scripts (packaging, export, hygiene, provenance)
+- `example-specs/` - sample specs to explore the flow
 
 Quick Start
-- Use `/specify`, `/clarify`, `/plan`, `/tasks`, `/analyze`, `/implement` as usual
-- Generated docs under `specs/<feature>/` must carry a provenance header at top
-- Normalize characters before committing (or let pre-commit fix staged files)
+- Author: use `/specify`, `/clarify`, `/plan`, `/tasks`, `/analyze`, `/implement`.
+- Provenance: generated docs should include a top-of-file provenance header.
+- Hygiene: normalize characters before committing (ASCII hyphen; no NBSP/ZWSP; UTF-8).
 
-Scripts
-- `.specify/scripts/provenance.ps1` - add/verify provenance headers
-- `.specify/scripts/character_hygiene.ps1` - check/normalize characters
-- `.specify/scripts/package_dist.ps1` - build dist zips into `packages/`
-- `.specify/scripts/export_pipeline.ps1` - export governance bundle
+MCA Flow (mc00 → mc08)
+- `/mc00-init` → initialize kit (mode/base)
+- `/mc01-constitution` → review/tweak constitution
+- `/mc02-specify` → write/extend spec
+- `/mc03-clarify` → resolve ambiguities
+- `/mc04-plan` → phased plan
+- `/mc05-tasks` → TDD-first tasks
+- `/mc06-analyze` → checks + gates
+- `/mc07-implement` → focused changes
+- `/mc08-reflect` → lessons back to specs/constitution
 
-License
-- See repository license or contact the maintainer.
+Build the zip (from the repo root)
+- `pwsh .specify/scripts/package_dist.ps1 -Version X.Y.Z`
+
+For detailed guidance, see the repository README and the handover in `docs/HANDOVER.md`.
 
