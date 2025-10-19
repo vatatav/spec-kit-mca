@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 1) Collect staged files
+mapfile -t staged < <(git diff --name-only --cached --diff-filter=ACMR)
+[[ ${#staged[@]} -eq 0 ]] && exit 0
+
+# 2) Filter by extensions of interest
+exts="md txt sh yml yaml json"
+targets=()
+for f in "${staged[@]}"; do
+  e="${f##*.}"; e="${e,,}"
+  for x in $exts; do if [[ "$e" == "$x" ]]; then targets+=("$f"); break; fi; done
+done
+[[ ${#targets[@]} -eq 0 ]] && exit 0
+
+# 3) Character hygiene fix on staged files, then re-stage
+for f in "${targets[@]}"; do
+  ./.specify/scripts/bash/character_hygiene.sh -r "$f" -f >/dev/null || true
+done
+git add -- "${targets[@]}"
+
+# 4) Provenance presence check for generated docs
+prov_errors=()
+for f in "${targets[@]}"; do
+  if [[ "$f" =~ ^(.*/)?specs/.+/(spec|plan|tasks|quickstart)\.md$ ]]; then
+    ./.specify/scripts/bash/provenance.sh -p "$f" -c >/dev/null || prov_errors+=("$f")
+  fi
+done
+if [[ ${#prov_errors[@]} -gt 0 ]]; then
+  echo "Provenance header missing in:" >&2
+  for f in "${prov_errors[@]}"; do echo " - $f" >&2; done
+  echo "Hint: ./.specify/scripts/bash/provenance.sh -p <file> -g '/plan|/tasks|manual'" >&2
+  exit 1
+fi
+
+exit 0
+

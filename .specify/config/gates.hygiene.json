@@ -1,0 +1,21 @@
+{
+  "include_globs": [
+    ".codex/prompts/**/*.md",
+    ".specify/templates/**/*.md",
+    ".specify/memory/**/*.md",
+    ".specify/scripts/**/*.ps1",
+    ".specify/scripts/**/*.sh",
+    ".kit/modes/**/*.md",
+    "user_prompts/**/*.md"
+  ],
+  "exclude_dirs": [
+    ".codex/log",
+    ".codex/sessions",
+    "zzz",
+    "data/upstream",
+    "data/one_piece",
+    "out",
+    "packages",
+    "specs"
+  ]
+}
