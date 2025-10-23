@@ -29,8 +29,10 @@ param(
   [ValidateSet('mca','org')]
   [string]$Base = 'mca',
 
-  [string]$AgentShell = 'codex-ps',
+  [string]$AgentShell = 'codex-ps', # kept for forward compatibility; not used for sources
 
+  [switch]$Quiet,
+  [switch]$Force,
   [switch]$AutoSetup
 )
 
@@ -42,60 +44,114 @@ function Ensure-Dir([string]$p) { if (-not (Test-Path -LiteralPath $p)) { New-It
 
 $repoRoot = (Resolve-Path .).Path
 
-# Source roots in flavors (development structure)
-$flavorRoot = Join-PathSafe (Join-PathSafe $repoRoot 'flavors') $AgentShell
-if (-not (Test-Path -LiteralPath $flavorRoot)) {
-  throw "Flavor not found: $flavorRoot"
+# Local source roots (src-only friendly)
+$promptsRoot = Join-PathSafe $repoRoot '.codex/prompts'
+$promptsMca  = Join-PathSafe $promptsRoot 'mca'
+$promptsOrg  = Join-PathSafe $promptsRoot 'org'
+$templatesRoot = Join-PathSafe $repoRoot '.specify/templates'
+$tmplMca = Join-PathSafe $templatesRoot 'mca'
+$tmplOrg = Join-PathSafe $templatesRoot 'org'
+$memoryDir = Join-PathSafe $repoRoot '.specify/memory'
+$memMca = Join-PathSafe (Join-PathSafe $memoryDir 'mca') 'constitution.md'
+$memOrg = Join-PathSafe (Join-PathSafe $memoryDir 'org') 'constitution.md'
+
+Ensure-Dir $promptsRoot
+Ensure-Dir $templatesRoot
+Ensure-Dir $memoryDir
+
+# Init-mode marker and current mode detection (ask-first behavior)
+$markerDir  = Join-PathSafe $repoRoot '.specify'
+$markerPath = Join-PathSafe $markerDir '.init-mode'
+$existingMode = $null
+$existingBase = $null
+try {
+  if (Test-Path -LiteralPath $markerPath) {
+    $lines = Get-Content -LiteralPath $markerPath -Encoding UTF8
+    $modeLine = $lines | Where-Object { $_ -like 'Mode=*' } | Select-Object -First 1
+    $baseLine = $lines | Where-Object { $_ -like 'Base=*' } | Select-Object -First 1
+    if ($modeLine) { $existingMode = $modeLine.Split('=')[1] }
+    if ($baseLine) { $existingBase = $baseLine.Split('=')[1] }
+  }
+} catch {}
+if (-not $Force -and $existingMode -and $existingBase -and $existingMode -eq $Mode -and $existingBase -eq $Base) {
+  if ($Quiet) {
+    Write-Host ("Already in {0}/{1}; no changes applied (Quiet)." -f $Mode,$Base) -ForegroundColor Yellow
+    return
+  } else {
+    try { $ans = Read-Host ("Already in {0}/{1}. Switch anyway? (y/N)" -f $Mode,$Base) } catch { $ans = 'N' }
+    if ($ans -notin @('y','Y','yes','YES')) {
+      Write-Host 'Staying on current mode/base.' -ForegroundColor Yellow
+      return
+    }
+  }
 }
 
-$constitutionsDir = Join-PathSafe $flavorRoot '.specify/templates/constitutions'
+# Seed MCA prompt base if missing and current root has mc*.md (first-run convenience)
+if (-not (Test-Path -LiteralPath $promptsMca)) {
+  Ensure-Dir $promptsMca
+  Get-ChildItem -LiteralPath $promptsRoot -Filter 'mc*.md' -File -ErrorAction SilentlyContinue | ForEach-Object {
+    Copy-Item -Force -LiteralPath $_.FullName -Destination (Join-PathSafe $promptsMca $_.Name)
+  }
+}
+
+# Resolve constitution base
 switch ($Base) {
-  'mca' { $basePath = Join-PathSafe $constitutionsDir 'mca_constitution_base.md' }
-  'org' { $basePath = Join-PathSafe $constitutionsDir 'org_constitution_base.md' }
+  'mca' { $basePath = $memMca }
+  'org' { $basePath = $memOrg }
 }
-
 if (-not (Test-Path -LiteralPath $basePath)) {
   throw "Constitution base not found: $basePath"
 }
 
-# Target locations
-$memoryDir = Join-PathSafe $repoRoot '.specify/memory'
-Ensure-Dir $memoryDir
+# Apply constitution
 $targetConst = Join-PathSafe $memoryDir 'constitution.md'
-
 Copy-Item -LiteralPath $basePath -Destination $targetConst -Force
-
 $changed = @($targetConst)
 
+# Apply templates
 if ($Mode -eq 'ORG') {
-  # Replace local templates with ORG variants from flavor
-  $orgTmplDir = Join-PathSafe $flavorRoot '.specify/templates/org'
-  $localTmplDir = Join-PathSafe $repoRoot '.specify/templates'
-  if (-not (Test-Path -LiteralPath $orgTmplDir)) { throw "Org templates not found: $orgTmplDir" }
-  Ensure-Dir $localTmplDir
-  Get-ChildItem -LiteralPath $orgTmplDir -Filter *.md | ForEach-Object {
-    $dest = Join-PathSafe $localTmplDir $_.Name
+  if (-not (Test-Path -LiteralPath $tmplOrg)) { throw "Org templates not found: $tmplOrg" }
+  Get-ChildItem -LiteralPath $tmplOrg -Filter *.md -File | ForEach-Object {
+    $dest = Join-PathSafe $templatesRoot $_.Name
     Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
     $changed += $dest
   }
-
-  # Update active prompts: hide MCA mc* and expose ORG prompts
-  $activePrompts = Join-PathSafe $repoRoot '.codex/prompts'
-  Ensure-Dir $activePrompts
-  $mcaDisabled = Join-PathSafe $activePrompts '_mca_disabled'
-  Ensure-Dir $mcaDisabled
-  Get-ChildItem -LiteralPath $activePrompts -Filter 'mc*.md' -File -ErrorAction SilentlyContinue | ForEach-Object {
-    Move-Item -Force -LiteralPath $_.FullName -Destination (Join-PathSafe $mcaDisabled $_.Name)
+} else {
+  if (-not (Test-Path -LiteralPath $tmplMca)) { throw "MCA templates not found: $tmplMca" }
+  Get-ChildItem -LiteralPath $tmplMca -Filter *.md -File | ForEach-Object {
+    $dest = Join-PathSafe $templatesRoot $_.Name
+    Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
+    $changed += $dest
   }
-  $orgSrc = Join-PathSafe $flavorRoot '.codex/prompts/org'
-  if (Test-Path -LiteralPath $orgSrc) {
-    Copy-Item -Recurse -Force -Path (Join-PathSafe $orgSrc '*') -Destination (Join-PathSafe $activePrompts 'org')
+}
+
+# Ensure mc00-init.md exists in prompts root (copy from MCA base if missing)
+$mc00 = Join-PathSafe $promptsRoot 'mc00-init.md'
+if (-not (Test-Path -LiteralPath $mc00)) {
+  $mc00Base = Join-PathSafe $promptsMca 'mc00-init.md'
+  if (Test-Path -LiteralPath $mc00Base) {
+    Copy-Item -Force -LiteralPath $mc00Base -Destination $mc00
+  }
+}
+
+# Clear active prompts (root) except mc00-init.md
+Get-ChildItem -LiteralPath $promptsRoot -Filter *.md -File -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -ne 'mc00-init.md' } | ForEach-Object { Remove-Item -Force -LiteralPath $_.FullName }
+
+# Activate selected prompt set by copying into root
+if ($Mode -eq 'ORG') {
+  if (-not (Test-Path -LiteralPath $promptsOrg)) { throw "Org prompts not found: $promptsOrg" }
+  Get-ChildItem -LiteralPath $promptsOrg -Filter *.md -File | ForEach-Object {
+    Copy-Item -Force -LiteralPath $_.FullName -Destination (Join-PathSafe $promptsRoot $_.Name)
+  }
+} else {
+  if (-not (Test-Path -LiteralPath $promptsMca)) { throw "MCA prompts not found: $promptsMca" }
+  Get-ChildItem -LiteralPath $promptsMca -Filter *.md -File | ForEach-Object {
+    Copy-Item -Force -LiteralPath $_.FullName -Destination (Join-PathSafe $promptsRoot $_.Name)
   }
 }
 
 # Mark init mode
-$markerDir = Join-PathSafe $repoRoot '.specify'
-$markerPath = Join-PathSafe $markerDir '.init-mode'
 "Mode=$Mode`nBase=$Base`nAgentShell=$AgentShell`nInitializedAtUTC=$((Get-Date).ToUniversalTime().ToString('o'))" |
   Set-Content -LiteralPath $markerPath -Encoding utf8
 $changed += $markerPath
@@ -105,23 +161,12 @@ Write-Host "Mode: $Mode | Base: $Base | AgentShell: $AgentShell" -ForegroundColo
 Write-Host "Files updated:" -ForegroundColor Yellow
 $changed | ForEach-Object { Write-Host " - $_" }
 
-# Suggest next step based on latest feature artifacts
-try {
-  $specRoot = Join-PathSafe $repoRoot 'specs'
-  if (Test-Path $specRoot) {
-    $latest = Get-ChildItem -Path $specRoot -Directory | Where-Object { $_.Name -match '^(\d{3})-' } | Sort-Object Name -Descending | Select-Object -First 1
-    if ($latest) {
-      $specPath  = Join-PathSafe $latest.FullName 'spec.md'
-      $planPath  = Join-PathSafe $latest.FullName 'plan.md'
-      $tasksPath = Join-PathSafe $latest.FullName 'tasks.md'
-      $next = '/mc02-specify'
-      if (Test-Path $specPath) { $next = '/mc04-plan' }
-      if (Test-Path $planPath) { $next = '/mc05-tasks' }
-      if (Test-Path $tasksPath) { $next = '/mc06-analyze' }
-      Write-Host ("Suggested next command: {0}" -f $next) -ForegroundColor Cyan
-    }
-  }
-} catch {}
+# Suggest next commands (mode-specific)
+if ($Mode -eq 'ORG') {
+  Write-Host 'Next: /constitution -> /specify' -ForegroundColor Cyan
+} else {
+  Write-Host 'Next: /mc01-constitute -> /mc02-prep-next-spec' -ForegroundColor Cyan
+}
 
 # Optional auto-setup: initialize git, first commit, install pre-commit hook
 if ($AutoSetup) {
@@ -145,5 +190,7 @@ if ($AutoSetup) {
     Write-Warning "Auto-setup encountered an error: $($_.Exception.Message)"
   }
 }
+
+
 
 

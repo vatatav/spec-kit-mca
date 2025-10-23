@@ -34,4 +34,3 @@ Output
 # `$ARGUMENTS` from the command invocation (if any).
 # Step 3: Input Consolidation
 # Primary Input = Arguments + File Input.
-

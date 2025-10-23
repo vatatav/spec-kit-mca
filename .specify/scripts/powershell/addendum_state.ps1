@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 # Compute and persist an Addendum-ID for a given command prompt file.
 # - Extracts the active Addendum block from a prompt (between the first line starting with
-#   "Addendum:" and the line containing "ARCHIVE BELOW — DO NOT EXECUTE").
+#   "Addendum:" and the line containing "ARCHIVE BELOW - DO NOT EXECUTE").
 # - Normalizes content (UTF-8, CRLF→LF, trims trailing spaces) and computes SHA-256.
 # - Optional: persists state under .codex/state/addenda/<command>.id and updates the
 #   runtime prompt filename to include YY (two digits), incrementing only when the
@@ -27,7 +27,7 @@ function Get-ActiveAddendumBlock([string]$path) {
       if ($line -match '^Addendum:\s') { $in = $true; $lines += $line; continue }
       continue
     }
-    if ($line -match 'ARCHIVE BELOW\s*—\s*DO NOT EXECUTE' -or $line -match 'ARCHIVE BELOW\s*-\s*DO NOT EXECUTE') { break }
+    if ($line -match 'ARCHIVE BELOW\s*-\s*DO NOT EXECUTE' -or $line -match 'ARCHIVE BELOW\s*-\s*DO NOT EXECUTE') { break }
     $lines += $line
   }
   if ($lines.Count -eq 0) { throw "Could not find an active Addendum block in $path" }
@@ -130,4 +130,5 @@ if ($SetState) {
 }
 
 exit 0
+
 

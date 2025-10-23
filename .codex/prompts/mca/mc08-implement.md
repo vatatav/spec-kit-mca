@@ -132,4 +132,3 @@ After each batch:
 - Feedback iterations are capped at 3-5 for corrections only.
 - For scope or technology pivots, stop and route back to mc02-prep-next-spec → mc03-specify instead of extending this step.
 
-

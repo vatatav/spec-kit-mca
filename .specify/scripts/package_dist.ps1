@@ -136,7 +136,7 @@ if (Test-Path $userPrompts) {
   }
 }
 
-# Normalize timestamps for determinism (set to package stamp) — run last, after all file edits
+# Normalize timestamps for determinism (set to package stamp) - run last, after all file edits
 try {
   $uniform = [DateTime]::ParseExact($stamp, 'yyyyMMdd-HHmmss', [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal)
 } catch {
@@ -157,3 +157,4 @@ if (Test-Path $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 Compress-Archive -Path (Join-Path $stageRoot '*') -DestinationPath $zipPath
 
 Write-Host "Package created: $zipPath" -ForegroundColor Green
+
