@@ -1,0 +1,37 @@
+# Local agent runtime (do not publish)
+.codex/log/
+.codex/sessions/
+.codex/history.jsonl
+.codex/auth.*
+.codex/config.toml
+.codex/version.json
+
+# Local data snapshots (not shipped)
+exports/
+out/
+packages/
+
+# Personal scratch (folders/files you stage for later removal)
+zzz/
+**/zzz/
+zzz*.*
+**/zzz*.*
+
+# Temp and editor files
+.tmp_*
+*.tmp
+*.bak
+~$*
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Node/npm/pnpm caches if ever used
+node_modules/
+.pnpm-store/
+
+# Python caches if ever used
+__pycache__/
+*.pyc
+
